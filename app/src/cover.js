@@ -1,716 +1,486 @@
-/* Coral Dawn — poster renderer.
-   Draws the whole GTA-style cover onto a canvas, at any size, from a state
-   object and a list of loaded photos. No network, no DOM except canvas. */
-(function (global) {
-  'use strict';
+// Coral Dawn — cover renderer.
+// Draws the whole GTA-style poster on any 2d canvas, at any size, from one
+// state object. The editor preview and the PNG export call the same function,
+// so what you see is exactly what you download.
 
-  var PLUM = '#2b0a2e';
-  var CREAM = '#fff6e6';
-  var INK = '#241028';
+export const GRADES = {
+  'coral-dawn': {
+    label: 'Coral Dawn', sky: '#241a4d', horizon: '#ff7a5c', tint: '#ff8a6b',
+    tintAlpha: 0.16, filter: 'saturate(1.18) contrast(1.06) brightness(1.02)',
+    accent: '#ff6f61', accent2: '#35f0ff',
+  },
+  sunset: {
+    label: 'Sunset', sky: '#3a1c5e', horizon: '#ff9a3d', tint: '#ff9a3d',
+    tintAlpha: 0.18, filter: 'saturate(1.25) contrast(1.05)',
+    accent: '#ff9a3d', accent2: '#ff5ea8',
+  },
+  'neon-night': {
+    label: 'Neon Night', sky: '#12082e', horizon: '#7b2ff7', tint: '#b04dff',
+    tintAlpha: 0.20, filter: 'saturate(1.35) contrast(1.12) brightness(0.98)',
+    accent: '#ff2fb3', accent2: '#2fe8ff',
+  },
+  'golden-hour': {
+    label: 'Golden Hour', sky: '#4d2a10', horizon: '#ffc53d', tint: '#ffc53d',
+    tintAlpha: 0.18, filter: 'saturate(1.28) contrast(1.04) brightness(1.03)',
+    accent: '#ffc53d', accent2: '#ff7a3d',
+  },
+  'teal-dusk': {
+    label: 'Teal Dusk', sky: '#0d2f3a', horizon: '#2fd8c8', tint: '#2fd8c8',
+    tintAlpha: 0.14, filter: 'saturate(1.15) contrast(1.06)',
+    accent: '#2fd8c8', accent2: '#ffb37a',
+  },
+  ultraviolet: {
+    label: 'Ultraviolet', sky: '#1c0b3d', horizon: '#c04dff', tint: '#a64dff',
+    tintAlpha: 0.20, filter: 'saturate(1.4) contrast(1.1)',
+    accent: '#c04dff', accent2: '#ff5ea8',
+  },
+};
 
-  /* The five built-in sample photos, in fixed index order. The index IS the
-     assignment: 0 boulevard (the driver), 1 pier (the fixer),
-     2 dawn street (the getaway), 3 dawn boat (the lookout),
-     4 dawn tower (the insider). Panels always take photos by index, so the
-     street photo can never land in the boat panel and vice versa. */
-  var SAMPLES = [
-    { file: 'samples/boulevard.jpg', name: 'Boulevard', focus: [0.45, 0.35] },
-    { file: 'samples/pier.jpg', name: 'Pier', focus: [0.42, 0.30] },
-    { file: 'samples/dawn-street.jpg', name: 'Dawn street', focus: [0.36, 0.66] },
-    { file: 'samples/dawn-boat.jpg', name: 'Dawn boat', focus: [0.62, 0.42] },
-    { file: 'samples/dawn-tower.jpg', name: 'Dawn tower', focus: [0.63, 0.70] }
-  ];
+export const LAYOUTS = {
+  'hero-left': { label: 'Hero left', panels: 4 },
+  'hero-right': { label: 'Hero right', panels: 4 },
+  'hero-top': { label: 'Hero top', panels: 4 },
+  'hero-centre': { label: 'Hero centre', panels: 4 },
+  'six-grid': { label: 'Six grid', panels: 6 },
+  tilted: { label: 'Tilted snapshots', panels: 4 },
+};
 
-  var ROLES = ['THE DRIVER', 'THE FIXER', 'THE GETAWAY', 'THE LOOKOUT', 'THE INSIDER'];
+export const DEFAULT_ROLES = ['THE DRIVER', 'THE GETAWAY', 'THE CAPTAIN', 'THE LOOKOUT', 'THE RIDER', 'THE FIXER'];
 
-  var GRADES = {
-    'coral-dawn': {
-      label: 'Coral Dawn', dot: '#ff6b6b',
-      title: ['#ff5e6c', '#ff9d7a', '#ffd9a0', '#fff3c4'],
-      filter: 'saturate(1.18) contrast(1.06) brightness(1.04)',
-      tint: '#ff8a5c', tintAlpha: 0.10,
-      strip: ['#ffb37a', '#ff6b81', '#ff4d6d'],
-      frame: '#ff8a7a', accent: '#ff5e6c'
-    },
-    'sunset': {
-      label: 'Sunset', dot: '#ff7a1a',
-      title: ['#ff7a1a', '#ff4d6d', '#b04dff', '#7a2bff'],
-      filter: 'saturate(1.25) sepia(0.18) contrast(1.08)',
-      tint: '#ff6a00', tintAlpha: 0.12,
-      strip: ['#ffb347', '#ff5e3a', '#8a2be2'],
-      frame: '#ff9d5c', accent: '#ff7a1a'
-    },
-    'neon-night': {
-      label: 'Neon Night', dot: '#c44dff',
-      title: ['#00e5ff', '#ff4dd2', '#ff2e88', '#7a2bff'],
-      filter: 'saturate(1.35) contrast(1.12) brightness(0.96)',
-      tint: '#b44dff', tintAlpha: 0.14,
-      strip: ['#00e5ff', '#ff4dd2', '#2b0a4d'],
-      frame: '#c44dff', accent: '#ff4dd2'
-    },
-    'golden-hour': {
-      label: 'Golden Hour', dot: '#ffb400',
-      title: ['#ffb400', '#ff8a00', '#ffe9a3', '#fff6d8'],
-      filter: 'saturate(1.2) sepia(0.25) contrast(1.05)',
-      tint: '#ffb400', tintAlpha: 0.12,
-      strip: ['#ffd76a', '#ff9d00', '#ff6b35'],
-      frame: '#e8a33d', accent: '#ffb400'
-    },
-    'teal-dusk': {
-      label: 'Teal Dusk', dot: '#17b8a6',
-      title: ['#17e6c8', '#2bb3ff', '#7a5cff', '#ff7ab8'],
-      filter: 'saturate(1.15) contrast(1.07) brightness(0.98)',
-      tint: '#17b8a6', tintAlpha: 0.12,
-      strip: ['#2be6c8', '#1a7ab8', '#123a5c'],
-      frame: '#2bb3a6', accent: '#17b8a6'
-    },
-    'ultraviolet': {
-      label: 'Ultraviolet', dot: '#a64dff',
-      title: ['#e64dff', '#a64dff', '#5c2bff', '#ff5ea8'],
-      filter: 'saturate(1.3) contrast(1.1) hue-rotate(12deg)',
-      tint: '#a64dff', tintAlpha: 0.14,
-      strip: ['#e64dff', '#7a2bff', '#1a0a3d'],
-      frame: '#a64dff', accent: '#e64dff'
-    }
+export function defaultState() {
+  return {
+    layout: 'hero-left',
+    grade: 'coral-dawn',
+    title: 'CORAL DAWN',
+    subtitle: 'first light, last getaway',
+    tagline: 'SUN UP · ENGINES HOT · NO WAY BACK',
+    quote: 'A SUNRISE YOU CAN HANG ON YOUR WALL',
+    outlet: 'THE CORAL LEDGER',
+    ticket: 'DAWN EDITION',
+    billing: 'PEACH COVE PICTURES PRESENTS · A CORAL DAWN PRODUCTION · STARRING YOU · SHOT ON YOUR OWN CAMERA · GRADED BY HAND',
+    titleStyle: 'striped',
+    showRoles: true, showSeal: true, showQuote: true, showStamps: true,
+    showBilling: true, showFooter: true,
+    paint: 0.8, halftone: 0.5, grain: 0.35, glow: 0.8,
+    panels: [
+      { photo: 0, role: 'THE DRIVER', zoom: 1, x: 0.5, y: 0.60, rot: 0, flip: false },
+      { photo: 1, role: 'THE GETAWAY', zoom: 1, x: 0.5, y: 0.5, rot: 0, flip: false },
+      { photo: 2, role: 'THE CAPTAIN', zoom: 1, x: 0.5, y: 0.34, rot: 0, flip: false },
+      { photo: 3, role: 'THE LOOKOUT', zoom: 1, x: 0.5, y: 0.52, rot: 0, flip: false },
+      { photo: 4, role: 'THE RIDER', zoom: 1, x: 0.5, y: 0.45, rot: 0, flip: false },
+      { photo: 0, role: 'THE FIXER', zoom: 1.35, x: 0.5, y: 0.3, rot: 0, flip: false },
+    ],
   };
+}
 
-  var LAYOUTS = {
-    'hero-top': { label: 'Hero Top' },
-    'hero-left': { label: 'Hero Left' },
-    'hero-right': { label: 'Hero Right' },
-    'hero-centre': { label: 'Hero Centre' },
-    'six-grid': { label: 'Six Grid' },
-    'tilted': { label: 'Tilted Snaps' }
-  };
-
-  var SIZES = {
-    square: { w: 1080, h: 1080, label: 'Square · 1080×1080' },
-    portrait: { w: 1080, h: 1350, label: 'Portrait · 1080×1350' },
-    wide: { w: 1920, h: 1080, label: 'Wide · 1920×1080' }
-  };
-
-  function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
-
-  /* Default state: a finished cover on screen, no placeholder anywhere. */
-  function defaultState() {
-    return {
-      layout: 'hero-top',
-      grade: 'coral-dawn',
-      size: 'square',
-      title: 'CORAL DAWN',
-      subtitle: 'chasing the sunrise',
-      tagline: 'SUN UP · ENGINES HOT · NO WAY BACK',
-      quote: 'A SUNRISE YOU CAN HANG ON YOUR WALL',
-      outlet: 'THE PEACH COVE GAZETTE',
-      badge: 'VOL. 02',
-      billing: 'PEACH COVE PICTURES PRESENTS · A CORAL DAWN PRODUCTION · STARRING YOU · SHOT ON YOUR OWN CAMERA · GRADED BY HAND',
-      titleStyle: 'striped',
-      paint: 65, halftone: 30, grain: 25, glow: 40, ink: true,
-      roles: ROLES.slice(),
-      show: { roles: true, quote: true, seal: true, stamps: true, billing: true, strip: true },
-      /* photo index per slot, rebuilt by autoFill whenever the layout changes */
-      slots: [0, 1, 2, 3],
-      /* per-slot crop transforms, keyed by slot index */
-      pans: {}
-    };
-  }
-
-  /* Photo index for each slot of a layout, by SAMPLES index. */
-  function slotPhotos(layout) {
-    switch (layout) {
-      case 'hero-top': return [0, 1, 2, 3];
-      case 'hero-left': return [0, 1, 2, 3, 4];
-      case 'hero-right': return [0, 1, 2, 3, 4];
-      case 'hero-centre': return [0, 1, 2, 3, 4];
-      case 'six-grid': return [0, 1, 2, 3, 4, 0];
-      case 'tilted': return [0, 1, 2, 3, 4];
-      default: return [0, 1, 2, 3];
+// Panel rectangles as fractions of the poster area (x, y, w, h, rotation deg).
+export function layoutPanels(layout, count) {
+  const g = 0.012; // gap, in fractions of poster width
+  const hero = (x, y, w, h) => ({ x, y, w, h, rot: 0 });
+  switch (layout) {
+    case 'hero-right': {
+      const r = [hero(0.42, 0, 0.58, 1)];
+      const cw = 0.40 - g;
+      for (let i = 0; i < 3; i++) r.push(hero(0, i * (1 / 3) + (i ? g / 2 : 0), cw, 1 / 3 - g / 2));
+      return r.slice(0, count);
+    }
+    case 'hero-top': {
+      const r = [hero(0, 0, 1, 0.56)];
+      const pw = (1 - 2 * g) / 3;
+      for (let i = 0; i < 3; i++) r.push(hero(i * (pw + g), 0.58, pw, 0.42));
+      return r.slice(0, count);
+    }
+    case 'hero-centre': {
+      const side = 0.30 - g;
+      const r = [hero(0, 0, side, 0.49), hero(0, 0.51, side, 0.49), hero(0.31, 0, 0.38, 1),
+        hero(0.70, 0, side, 0.49), hero(0.70, 0.51, side, 0.49)];
+      return r.slice(0, count);
+    }
+    case 'six-grid': {
+      const cw = (1 - 2 * g) / 3, ch = (1 - g) / 2;
+      const r = [];
+      for (let row = 0; row < 2; row++) for (let col = 0; col < 3; col++)
+        r.push(hero(col * (cw + g), row * (ch + g), cw, ch));
+      return r.slice(0, count);
+    }
+    case 'tilted': {
+      return [
+        { x: 0.02, y: 0.03, w: 0.46, h: 0.52, rot: -3 },
+        { x: 0.52, y: 0.05, w: 0.46, h: 0.44, rot: 2.5 },
+        { x: 0.06, y: 0.58, w: 0.44, h: 0.40, rot: 2 },
+        { x: 0.54, y: 0.52, w: 0.42, h: 0.45, rot: -2 },
+      ].slice(0, count);
+    }
+    case 'hero-left':
+    default: {
+      const r = [hero(0, 0, 0.58, 1)];
+      const cw = 0.40 - g;
+      for (let i = 0; i < 3; i++) r.push(hero(0.60, i * (1 / 3) + (i ? g / 2 : 0), cw, 1 / 3 - g / 2));
+      return r.slice(0, count);
     }
   }
+}
 
-  /* Slot rectangles as fractions of the poster (x, y, w, h), plus slant. */
-  function slotRects(layout, W, H) {
-    var q = 0.052;            /* quote bar height, fraction of H */
-    var f = 0.014;            /* frame inset, fraction of W */
-    var top = q + 0.008;
-    var bottom = 0.725;       /* photo area bottom, fraction of H */
-    var iw = 1 - f * 2;
-    var g = 0.012;            /* gap between panels, fraction of W */
-    var s = [];
-    if (layout === 'hero-top') {
-      s.push({ x: f, y: top, w: iw, h: 0.395, slant: 0.018, hero: true });
-      var py = 0.505, ph = bottom - py;
-      var w1 = 0.315, w2 = 0.35, w3 = iw - w1 - w2 - g * 2;
-      s.push({ x: f, y: py, w: w1, h: ph });
-      s.push({ x: f + w1 + g, y: py, w: w2, h: ph });
-      s.push({ x: f + w1 + g + w2 + g, y: py, w: w3, h: ph });
-    } else if (layout === 'hero-left' || layout === 'hero-right') {
-      var left = layout === 'hero-left';
-      var hw = 0.50;
-      var hx = left ? f : 1 - f - hw;
-      s.push({ x: hx, y: top, w: hw, h: bottom - top, hero: true });
-      var gx = left ? f + hw + g : f;
-      var gw = iw - hw - g;
-      var cw = (gw - g) / 2, ch = (bottom - top - g) / 2;
-      s.push({ x: gx, y: top, w: cw, h: ch });
-      s.push({ x: gx + cw + g, y: top, w: cw, h: ch });
-      s.push({ x: gx, y: top + ch + g, w: cw, h: ch });
-      s.push({ x: gx + cw + g, y: top + ch + g, w: cw, h: ch });
-    } else if (layout === 'hero-centre') {
-      var chw = 0.42, chx = (1 - chw) / 2;
-      s.push({ x: chx, y: top, w: chw, h: bottom - top, hero: true });
-      var sw = (chx - f - g);
-      var sh = (bottom - top - g) / 2;
-      s.push({ x: f, y: top, w: sw, h: sh });
-      s.push({ x: f, y: top + sh + g, w: sw, h: sh });
-      s.push({ x: 1 - f - sw, y: top, w: sw, h: sh });
-      s.push({ x: 1 - f - sw, y: top + sh + g, w: sw, h: sh });
-    } else if (layout === 'six-grid') {
-      var cols = 3, rows = 2;
-      var cw2 = (iw - g * (cols - 1)) / cols;
-      var ch2 = (bottom - top - g * (rows - 1)) / rows;
-      for (var r = 0; r < rows; r++) {
-        for (var c = 0; c < cols; c++) {
-          s.push({ x: f + c * (cw2 + g), y: top + r * (ch2 + g), w: cw2, h: ch2, hero: r === 0 && c === 0 });
-        }
-      }
-    } else { /* tilted snapshots */
-      var tw = 0.30, th = 0.46;
-      var rots = [-0.06, 0.05, -0.03, 0.06, -0.05];
-      var xs = [0.03, 0.20, 0.38, 0.55, 0.70];
-      for (var i = 0; i < 5; i++) {
-        s.push({ x: xs[i], y: top + 0.02 + (i % 2) * 0.05, w: tw, h: th, rot: rots[i], snap: true, hero: i === 2 });
-      }
-    }
-    return s;
+// Where the title block sits, per layout (fractions of poster height).
+function titleZone(layout) {
+  if (layout === 'hero-top') return { y: 0.48, size: 0.175 };
+  if (layout === 'six-grid') return { y: 0.44, size: 0.17 };
+  if (layout === 'tilted') return { y: 0.46, size: 0.175 };
+  if (layout === 'hero-centre') return { y: 0.60, size: 0.175 };
+  return { y: 0.60, size: 0.185 }; // hero-left / hero-right
+}
+
+function drawStar(ctx, cx, cy, r, color) {
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const a = -Math.PI / 2 + (i * Math.PI) / 5;
+    const rr = i % 2 ? r * 0.45 : r;
+    ctx[i ? 'lineTo' : 'moveTo'](cx + Math.cos(a) * rr, cy + Math.sin(a) * rr);
   }
+  ctx.closePath(); ctx.fill();
+}
 
-  function titleY(layout) {
-    if (layout === 'tilted') return 0.60;
-    if (layout === 'hero-top') return 0.385;
-    return 0.475;
-  }
+function drawSparkle(ctx, cx, cy, r, color, glow) {
+  ctx.save();
+  ctx.fillStyle = color;
+  ctx.shadowColor = color; ctx.shadowBlur = glow;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - r); ctx.quadraticCurveTo(cx, cy, cx + r, cy);
+  ctx.quadraticCurveTo(cx, cy, cx, cy + r); ctx.quadraticCurveTo(cx, cy, cx - r, cy);
+  ctx.quadraticCurveTo(cx, cy, cx, cy - r);
+  ctx.fill(); ctx.restore();
+}
 
-  /* ---- drawing helpers ---- */
-
-  function fitFont(ctx, text, maxW, startPx, family, weight) {
-    var px = startPx;
-    while (px > 24) {
-      ctx.font = weight + ' ' + px + 'px ' + family;
-      if (ctx.measureText(text).width <= maxW) break;
-      px -= 4;
-    }
-    ctx.font = weight + ' ' + px + 'px ' + family;
-    return px;
-  }
-
-  function drawPhoto(ctx, img, rect, pan, grade, W, H) {
-    if (!img || !img.naturalWidth) {
-      ctx.fillStyle = '#e8d5c0';
-      ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
-      return;
-    }
-    var iw = img.naturalWidth, ih = img.naturalHeight;
-    var focus = SAMPLES[pan.photo] ? SAMPLES[pan.photo].focus : [0.5, 0.5];
-    var fx = clamp(focus[0], 0.08, 0.92), fy = clamp(focus[1], 0.08, 0.92);
-    /* Cover zoom that still covers the panel once the focus point is put
-       at the panel's centre: an off-centre focus needs extra zoom, or the
-       photo slides off one edge and leaves a cream gap. */
-    var zx = Math.max(rect.w / iw, rect.w / (2 * fx * iw), rect.w / (2 * (1 - fx) * iw));
-    var zy = Math.max(rect.h / ih, rect.h / (2 * fy * ih), rect.h / (2 * (1 - fy) * ih));
-    var zoom = (pan.zoom || 1) * Math.max(zx, zy);
-    var dw = iw * zoom, dh = ih * zoom;
-    /* focus point lands on the panel centre */
-    var cx = rect.x + rect.w / 2 + dw / 2 - fx * dw;
-    var cy = rect.y + rect.h / 2 + dh / 2 - fy * dh;
-    /* keep the user's pan inside the coverage bounds, so a drag can never
-       pull a cream gap into the panel */
-    var ox = clamp(pan.ox || 0, rect.x + rect.w - dw - (cx - dw / 2), rect.x - (cx - dw / 2));
-    var oy = clamp(pan.oy || 0, rect.y + rect.h - dh - (cy - dh / 2), rect.y - (cy - dh / 2));
-    cx += ox;
-    cy += oy;
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(rect.x, rect.y, rect.w, rect.h);
-    ctx.clip();
-    if (grade.filter) { try { ctx.filter = grade.filter; } catch (e) { /* old canvas */ } }
-    if (pan.rot) {
-      ctx.translate(rect.x + rect.w / 2, rect.y + rect.h / 2);
-      ctx.rotate(pan.rot * Math.PI / 180);
-      ctx.translate(-(rect.x + rect.w / 2), -(rect.y + rect.h / 2));
-    }
-    if (pan.flip) {
-      ctx.translate(rect.x + rect.w / 2, 0);
-      ctx.scale(-1, 1);
-      ctx.translate(-(rect.x + rect.w / 2), 0);
-    }
-    ctx.drawImage(img, cx - dw / 2, cy - dh / 2, dw, dh);
-    try { ctx.filter = 'none'; } catch (e) { /* ignore */ }
-    if (grade.tint) {
-      ctx.globalCompositeOperation = 'overlay';
-      ctx.globalAlpha = grade.tintAlpha * (0.5 + (global.__paint || 65) / 130);
-      ctx.fillStyle = grade.tint;
-      ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
-      ctx.globalAlpha = 1;
-      ctx.globalCompositeOperation = 'source-over';
-    }
-    ctx.restore();
-  }
-
-  function frameRect(ctx, x, y, w, h, color, lw) {
-    ctx.save();
-    ctx.strokeStyle = color;
-    ctx.lineWidth = lw;
-    ctx.strokeRect(x + lw / 2, y + lw / 2, w - lw, h - lw);
-    ctx.restore();
-  }
-
-  function roundRect(ctx, x, y, w, h, r) {
-    ctx.beginPath();
-    ctx.moveTo(x + r, y);
-    ctx.arcTo(x + w, y, x + w, y + h, r);
-    ctx.arcTo(x + w, y + h, x, y + h, r);
-    ctx.arcTo(x, y + h, x, y, r);
-    ctx.arcTo(x, y, x + w, y, r);
-    ctx.closePath();
-  }
-
-  function star4(ctx, x, y, r) {
-    ctx.beginPath();
-    ctx.moveTo(x, y - r);
-    ctx.quadraticCurveTo(x, y, x + r, y);
-    ctx.quadraticCurveTo(x, y, x, y + r);
-    ctx.quadraticCurveTo(x, y, x - r, y);
-    ctx.quadraticCurveTo(x, y, x, y - r);
-    ctx.closePath();
-  }
-
-  function starburst(ctx, x, y, rOuter, rInner, points) {
-    ctx.beginPath();
-    for (var i = 0; i < points * 2; i++) {
-      var r = i % 2 === 0 ? rOuter : rInner;
-      var a = (i / (points * 2)) * Math.PI * 2 - Math.PI / 2;
-      var px = x + Math.cos(a) * r, py = y + Math.sin(a) * r;
-      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
-    }
-    ctx.closePath();
-  }
-
-  function drawPalm(ctx, x, y, s, flip) {
-    ctx.save();
-    ctx.translate(x, y);
-    ctx.scale(flip ? -s : s, s);
-    ctx.strokeStyle = PLUM;
-    ctx.fillStyle = PLUM;
-    ctx.lineWidth = 5;
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.quadraticCurveTo(6, -52, 2, -96);
+function drawPalm(ctx, x, y, s, color) {
+  // Simple palm silhouette: curved trunk, fronds arcing down from the crown.
+  ctx.save(); ctx.strokeStyle = color; ctx.fillStyle = color;
+  ctx.lineWidth = Math.max(2, s * 0.10); ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(x, y);
+  ctx.quadraticCurveTo(x + s * 0.06, y - s * 0.55, x + s * 0.20, y - s * 0.92); ctx.stroke();
+  const cx = x + s * 0.20, cy = y - s * 0.92;
+  ctx.lineWidth = Math.max(1.5, s * 0.05);
+  for (let i = 0; i < 5; i++) {
+    const a = Math.PI * (0.08 + i * 0.21); // fan from right-down to left-down
+    const ex = cx + Math.cos(a) * s * 0.52;
+    const ey = cy + Math.sin(a) * s * 0.34;
+    ctx.beginPath(); ctx.moveTo(cx, cy);
+    ctx.quadraticCurveTo(cx + Math.cos(a) * s * 0.34, cy - s * 0.16, ex, ey);
     ctx.stroke();
-    var fronds = [[-58, -108], [-34, -122], [-6, -128], [24, -122], [52, -104], [64, -84]];
-    for (var i = 0; i < fronds.length; i++) {
-      ctx.beginPath();
-      ctx.moveTo(2, -96);
-      ctx.quadraticCurveTo(fronds[i][0] * 0.55, -96 + fronds[i][1] * 0.22, fronds[i][0], -96 + fronds[i][1] * 0.12);
-      ctx.lineWidth = 4.5;
-      ctx.stroke();
-    }
-    ctx.restore();
+  }
+  ctx.restore();
+}
+
+function drawSunriseStrip(ctx, x, y, w, h, grade) {
+  // Sun disc + palm silhouettes along a thin strip.
+  const sunR = h * 0.42;
+  const sun = ctx.createRadialGradient(x + w * 0.5, y + h * 0.55, sunR * 0.1, x + w * 0.5, y + h * 0.55, sunR);
+  sun.addColorStop(0, '#fff3c4'); sun.addColorStop(0.55, grade.horizon); sun.addColorStop(1, grade.horizon + '00');
+  ctx.fillStyle = sun;
+  ctx.beginPath(); ctx.arc(x + w * 0.5, y + h * 0.55, sunR, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#2a1245';
+  drawPalm(ctx, x + w * 0.07, y + h, h * 1.35, '#2a1245');
+  drawPalm(ctx, x + w * 0.93, y + h, h * 1.15, '#2a1245');
+  drawPalm(ctx, x + w * 0.20, y + h, h * 0.85, '#2a1245');
+  // horizon glow line
+  const lg = ctx.createLinearGradient(x, y + h * 0.62, x + w, y + h * 0.62);
+  lg.addColorStop(0, grade.horizon + '00'); lg.addColorStop(0.5, grade.horizon); lg.addColorStop(1, grade.horizon + '00');
+  ctx.fillStyle = lg; ctx.fillRect(x, y + h * 0.6, w, h * 0.05);
+}
+
+function drawBarcode(ctx, x, y, w, h, seed) {
+  let s = seed;
+  const rnd = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
+  ctx.fillStyle = '#1c1030';
+  let px = x;
+  while (px < x + w - 2) {
+    const bw = 1 + rnd() * 3.4;
+    if (rnd() > 0.42) ctx.fillRect(px, y, bw, h);
+    px += bw + 1 + rnd() * 2.4;
+  }
+}
+
+function drawSeal(ctx, cx, cy, r, text) {
+  ctx.save(); ctx.translate(cx, cy);
+  ctx.fillStyle = '#f5b942';
+  ctx.beginPath();
+  for (let i = 0; i < 32; i++) {
+    const a = (i * Math.PI) / 16;
+    const rr = i % 2 ? r * 0.86 : r;
+    ctx[i ? 'lineTo' : 'moveTo'](Math.cos(a) * rr, Math.sin(a) * rr);
+  }
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#ffe9ad';
+  ctx.beginPath(); ctx.arc(0, 0, r * 0.72, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#7a4d00';
+  ctx.font = `900 ${r * 0.34}px Anton, sans-serif`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const words = text.split(' ');
+  words.forEach((wd, i) => ctx.fillText(wd, 0, (i - (words.length - 1) / 2) * r * 0.4));
+  ctx.restore();
+}
+
+function drawPhoto(ctx, img, rect, panel, grade, state) {
+  const { x, y, w, h } = rect;
+  ctx.save();
+  ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
+  if (panel.rot) {
+    ctx.translate(x + w / 2, y + h / 2); ctx.rotate((panel.rot * Math.PI) / 180); ctx.translate(-(x + w / 2), -(y + h / 2));
+  }
+  const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
+  const scale = Math.max(w / iw, h / ih) * (panel.zoom || 1);
+  const dw = iw * scale, dh = ih * scale;
+  const dx = x + w / 2 - dw * (panel.x ?? 0.5) + (panel.flip ? 0 : 0);
+  const dy = y + h / 2 - dh * (panel.y ?? 0.5);
+  ctx.filter = grade.filter;
+  if (panel.flip) { ctx.translate(x + w, 0); ctx.scale(-1, 1); ctx.drawImage(img, dx - x, dy, dw, dh); }
+  else ctx.drawImage(img, dx, dy, dw, dh);
+  ctx.filter = 'none';
+  // grade wash: sky -> horizon gradient over the photo
+  const g = ctx.createLinearGradient(0, y, 0, y + h);
+  g.addColorStop(0, grade.sky + '55'); g.addColorStop(0.62, grade.horizon + '22'); g.addColorStop(1, grade.horizon + '44');
+  ctx.globalAlpha = state.paint;
+  ctx.fillStyle = g; ctx.fillRect(x, y, w, h);
+  ctx.globalAlpha = 1;
+  // halftone dots
+  if (state.halftone > 0.05) {
+    ctx.globalAlpha = state.halftone * 0.16; ctx.fillStyle = '#1c1030';
+    const step = Math.max(7, w / 90);
+    for (let py = y + step / 2; py < y + h; py += step)
+      for (let px = x + step / 2; px < x + w; px += step) {
+        ctx.beginPath(); ctx.arc(px, py, step * 0.16, 0, Math.PI * 2); ctx.fill();
+      }
+    ctx.globalAlpha = 1;
+  }
+  ctx.restore();
+  // thin cream frame around the panel
+  ctx.strokeStyle = '#fff3d6'; ctx.lineWidth = Math.max(2, w * 0.006);
+  ctx.strokeRect(x, y, w, h);
+}
+
+function drawRoleLabel(ctx, rect, role, accent, maxBottom) {
+  const barH = Math.max(20, rect.h * 0.115);
+  const bx = rect.x, by = Math.min(rect.y + rect.h - barH, maxBottom - barH);
+  ctx.fillStyle = 'rgba(12,6,26,0.92)';
+  ctx.fillRect(bx, by, rect.w, barH);
+  ctx.fillStyle = accent;
+  ctx.beginPath();
+  ctx.moveTo(bx, by); ctx.lineTo(bx + barH * 0.28, by); ctx.lineTo(bx + barH * 0.62, by + barH); ctx.lineTo(bx, by + barH);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#fff';
+  ctx.font = `400 ${barH * 0.52}px Anton, sans-serif`;
+  ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  ctx.fillText(role, bx + barH * 0.78, by + barH * 0.54, rect.w - barH);
+}
+
+// The main entry point: draw the full poster on ctx at W x H.
+export function drawCover(ctx, W, H, state, photos) {
+  const grade = GRADES[state.grade] || GRADES['coral-dawn'];
+  const u = W / 1920; // unit scale, poster designed at 1920 wide
+  const wide = W / H > 1.35; // wide covers keep the title centred; square/portrait shift it to the hero side
+  ctx.clearRect(0, 0, W, H);
+  // Warm cream field the poster sits on.
+  ctx.fillStyle = '#f7ead2'; ctx.fillRect(0, 0, W, H);
+  const m = Math.round(W * 0.014); // outer margin
+  const px = m, py = m, pw = W - 2 * m, ph = H - 2 * m;
+  // Poster paper: deep plum night sky.
+  const sky = ctx.createLinearGradient(0, py, 0, py + ph);
+  sky.addColorStop(0, grade.sky); sky.addColorStop(0.55, grade.sky); sky.addColorStop(1, grade.horizon);
+  ctx.fillStyle = sky; ctx.fillRect(px, py, pw, ph);
+  ctx.strokeStyle = grade.accent; ctx.lineWidth = Math.max(2, 3 * u);
+  ctx.strokeRect(px, py, pw, ph);
+
+  const panels = layoutPanels(state.layout, LAYOUTS[state.layout].panels);
+  const rects = panels.map((p) => ({
+    x: px + p.x * pw, y: py + p.y * ph, w: p.w * pw, h: p.h * ph, rot: p.rot || 0,
+  }));
+
+  // Photos
+  rects.forEach((r, i) => {
+    const p = state.panels[i] || defaultState().panels[i];
+    const img = photos[p.photo];
+    if (img) drawPhoto(ctx, img, r, p, grade, state);
+    else { ctx.fillStyle = '#3a2358'; ctx.fillRect(r.x, r.y, r.w, r.h); }
+  });
+
+  // Sunrise strip along the seam / bottom of the poster.
+  if (state.showStamps) {
+    const stripH = ph * 0.085;
+    drawSunriseStrip(ctx, px + pw * 0.30, py + ph - stripH - ph * 0.10, pw * 0.40, stripH, grade);
   }
 
-  function halftonePattern() {
-    if (global.__htPat) return global.__htPat;
-    var c = document.createElement('canvas');
-    c.width = 9; c.height = 9;
-    var g = c.getContext('2d');
-    g.fillStyle = '#1a0a2e';
-    g.beginPath(); g.arc(4.5, 4.5, 1.5, 0, Math.PI * 2); g.fill();
-    global.__htPat = c;
-    return c;
-  }
+  const bbH = ph * 0.085;
+  const bbY = py + ph - bbH;
 
-  function grainPattern() {
-    if (global.__grPat) return global.__grPat;
-    var c = document.createElement('canvas');
-    c.width = 140; c.height = 140;
-    var g = c.getContext('2d');
-    var img = g.createImageData(140, 140);
-    for (var i = 0; i < img.data.length; i += 4) {
-      var v = 110 + Math.floor(Math.random() * 90);
-      img.data[i] = v; img.data[i + 1] = v; img.data[i + 2] = v; img.data[i + 3] = 255;
-    }
-    g.putImageData(img, 0, 0);
-    global.__grPat = c;
-    return c;
-  }
-
-  /* ---- the poster ---- */
-
-  function renderCover(canvas, state, images) {
-    var W = canvas.width, H = canvas.height;
-    var ctx = canvas.getContext('2d');
-    var grade = GRADES[state.grade] || GRADES['coral-dawn'];
-    var S = Math.min(W, H) / 1080; /* scale unit */
-    global.__paint = state.paint;
-    var rects = slotRects(state.layout, W, H);
-    var photos = slotPhotos(state.layout);
-
-    /* cream field */
-    ctx.clearRect(0, 0, W, H);
-    ctx.fillStyle = CREAM;
-    ctx.fillRect(0, 0, W, H);
-
-    /* top quote bar */
-    if (state.show.quote) {
-      var qh = H * 0.052;
-      ctx.fillStyle = PLUM;
-      ctx.fillRect(0, 0, W, qh);
-      ctx.fillStyle = '#ffc21c';
-      ctx.font = '900 ' + Math.round(qh * 0.42) + 'px Anton, "Arial Black", sans-serif';
-      ctx.textBaseline = 'middle';
-      ctx.textAlign = 'left';
-      ctx.fillText('★★★★★', W * 0.014, qh * 0.54);
-      ctx.fillStyle = '#fff6e6';
-      ctx.font = '700 ' + Math.round(qh * 0.34) + 'px Anton, "Arial Black", sans-serif';
-      ctx.textAlign = 'center';
-      var quoteLine = '“' + state.quote + '” — ' + state.outlet;
-      fitFont(ctx, quoteLine, W * 0.72, Math.round(qh * 0.36), 'Anton, "Arial Black", sans-serif', '700');
-      ctx.fillText(quoteLine, W * 0.5, qh * 0.54);
-      /* ticket badge */
-      var bw = W * 0.085, bh = qh * 0.62;
-      var bx = W - bw - W * 0.012, by = (qh - bh) / 2;
-      ctx.fillStyle = '#ffc21c';
-      roundRect(ctx, bx, by, bw, bh, bh / 2);
-      ctx.fill();
-      ctx.fillStyle = PLUM;
-      ctx.font = '900 ' + Math.round(bh * 0.52) + 'px Anton, "Arial Black", sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(state.badge, bx + bw / 2, by + bh / 2 + 1);
-      ctx.textAlign = 'left';
-    }
-
-    /* photos */
-    for (var i = 0; i < rects.length; i++) {
-      var r = rects[i];
-      var px = r.x * W, py = r.y * H, pw = r.w * W, ph = r.h * H;
-      var pan = Object.assign({ photo: photos[i], zoom: 1, ox: 0, oy: 0, rot: 0, flip: false }, state.pans[i] || {});
-      /* six-grid reuses the hero photo in its last slot: zoom in so it reads
-         as a clearly different crop, not the same picture twice */
-      if (state.layout === 'six-grid' && i === 5) pan.zoom = (pan.zoom || 1) * 1.7;
-      ctx.save();
-      if (r.snap) {
-        ctx.translate(px + pw / 2, py + ph / 2);
-        ctx.rotate(r.rot || 0);
-        ctx.translate(-(px + pw / 2), -(py + ph / 2));
-        ctx.fillStyle = '#ffffff';
-        ctx.shadowColor = 'rgba(43,10,46,0.35)';
-        ctx.shadowBlur = 14 * S;
-        ctx.shadowOffsetY = 5 * S;
-        ctx.fillRect(px - 7 * S, py - 7 * S, pw + 14 * S, ph + 14 * S);
-        ctx.shadowColor = 'transparent';
-        ctx.shadowBlur = 0;
-        ctx.shadowOffsetY = 0;
-      }
-      if (r.slant) {
-        ctx.beginPath();
-        ctx.moveTo(px, py);
-        ctx.lineTo(px + pw, py);
-        ctx.lineTo(px + pw, py + ph - r.slant * H);
-        ctx.lineTo(px, py + ph);
-        ctx.closePath();
-        ctx.clip();
-        drawPhoto(ctx, images[pan.photo], { x: px, y: py, w: pw, h: ph }, pan, grade, W, H);
-        ctx.restore();
-        ctx.save();
-        ctx.beginPath();
-        ctx.moveTo(px, py);
-        ctx.lineTo(px + pw, py);
-        ctx.lineTo(px + pw, py + ph - r.slant * H);
-        ctx.lineTo(px, py + ph);
-        ctx.closePath();
-        ctx.strokeStyle = grade.frame;
-        ctx.lineWidth = Math.max(2, 3 * S);
-        ctx.stroke();
-        ctx.restore();
-      } else {
-        drawPhoto(ctx, images[pan.photo], { x: px, y: py, w: pw, h: ph }, pan, grade, W, H);
-        frameRect(ctx, px, py, pw, ph, grade.frame, Math.max(2, 3 * S));
-        ctx.restore();
-      }
-      /* sunrise badge on the hero band */
-      if (r.hero && state.show.stamps && (state.layout === 'hero-top' || state.layout === 'hero-centre')) {
-        var tag = 'SUNRISE 06:47 · PEACH COVE';
-        ctx.font = '700 ' + Math.round(15 * S + 4) + 'px Anton, "Arial Black", sans-serif';
-        var tw = ctx.measureText(tag).width + 22 * S;
-        var tx = px + pw - tw - 10 * S, ty = py + 10 * S;
-        ctx.fillStyle = 'rgba(43,10,46,0.85)';
-        roundRect(ctx, tx, ty, tw, 26 * S, 13 * S);
-        ctx.fill();
-        ctx.fillStyle = '#fff6e6';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(tag, tx + tw / 2, ty + 13 * S + 1);
-        ctx.textAlign = 'left';
-      }
-      /* role tag */
-      if (state.show.roles) {
-        var role = state.roles[i] || ROLES[i % ROLES.length];
-        ctx.font = '900 ' + Math.round(15 * S + 4) + 'px Anton, "Arial Black", sans-serif';
-        var rw = ctx.measureText(role).width + 20 * S;
-        var rh = 26 * S;
-        var rx = px + 6 * S, ry = py + ph - rh - 8 * S;
-        ctx.save();
-        ctx.beginPath();
-        ctx.moveTo(rx, ry);
-        ctx.lineTo(rx + rw, ry);
-        ctx.lineTo(rx + rw - 9 * S, ry + rh);
-        ctx.lineTo(rx, ry + rh);
-        ctx.closePath();
-        ctx.fillStyle = PLUM;
-        ctx.fill();
-        ctx.fillStyle = '#fff6e6';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(role, rx + rw / 2 - 4 * S, ry + rh / 2 + 1);
-        ctx.textAlign = 'left';
-        ctx.restore();
-      }
-    }
-
-    /* sunrise glow over the hero */
-    if (state.glow > 0) {
-      var hero = rects[0];
-      var gx = (hero.x + 0.12) * W, gy = (hero.y + 0.22) * H;
-      var gr = Math.max(W, H) * 0.32;
-      var glowGrad = ctx.createRadialGradient(gx, gy, 0, gx, gy, gr);
-      glowGrad.addColorStop(0, 'rgba(255,236,170,' + (0.55 * state.glow / 100) + ')');
-      glowGrad.addColorStop(1, 'rgba(255,236,170,0)');
-      ctx.save();
-      ctx.globalCompositeOperation = 'screen';
-      ctx.fillStyle = glowGrad;
-      ctx.fillRect(gx - gr, gy - gr, gr * 2, gr * 2);
-      ctx.restore();
-    }
-
-    /* kicker + giant title over the seam */
-    var ty = titleY(state.layout) * H;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillStyle = '#ffffff';
-    ctx.shadowColor = 'rgba(43,10,46,0.55)';
-    ctx.shadowBlur = 6 * S;
-    ctx.shadowOffsetY = 2 * S;
-    var kickPx = fitFont(ctx, '★ WELCOME TO PEACH COVE ★', W * 0.62, Math.round(26 * S + 6), 'Anton, "Arial Black", sans-serif', '700');
-    ctx.fillText('★ WELCOME TO PEACH COVE ★', W / 2, ty - Math.round(118 * S + 18));
-    ctx.shadowColor = 'transparent';
-    ctx.shadowBlur = 0;
-    ctx.shadowOffsetY = 0;
-
-    var titlePx = fitFont(ctx, state.title, W * 0.94, Math.round(150 * S + 30), 'Anton, "Arial Black", sans-serif', '900');
-    var titleGrad;
-    if (state.titleStyle === 'glow') {
-      titleGrad = ctx.createLinearGradient(0, ty - titlePx * 0.55, 0, ty + titlePx * 0.55);
-      titleGrad.addColorStop(0, grade.title[0]);
-      titleGrad.addColorStop(0.55, grade.title[1]);
-      titleGrad.addColorStop(1, grade.title[2]);
-    } else {
-      /* striped dawn: hard horizontal bands through the letters */
-      titleGrad = ctx.createLinearGradient(0, ty - titlePx * 0.55, 0, ty + titlePx * 0.55);
-      var stops = grade.title;
-      var bands = 9;
-      for (var bi = 0; bi < bands; bi++) {
-        var c = stops[bi % stops.length];
-        titleGrad.addColorStop(bi / bands, c);
-        titleGrad.addColorStop(Math.min(1, (bi + 0.82) / bands), c);
-        var nc = stops[(bi + 1) % stops.length];
-        titleGrad.addColorStop(Math.min(1, (bi + 0.84) / bands), nc);
-      }
-    }
-    var shX = Math.round(7 * S + 2), shY = Math.round(8 * S + 2);
-    ctx.font = '900 ' + titlePx + 'px Anton, "Arial Black", sans-serif';
-    ctx.lineJoin = 'round';
-    ctx.strokeStyle = PLUM;
-    ctx.lineWidth = Math.max(4, titlePx * 0.055);
-    /* hard offset shadow */
-    ctx.save();
-    ctx.translate(shX, shY);
-    ctx.fillStyle = PLUM;
-    ctx.fillText(state.title, W / 2, ty);
-    ctx.restore();
-    /* main fill + outline */
-    ctx.fillStyle = titleGrad;
-    ctx.fillText(state.title, W / 2, ty);
-    ctx.strokeText(state.title, W / 2, ty);
-    if (state.titleStyle === 'glow') {
-      ctx.save();
-      ctx.shadowColor = grade.title[0];
-      ctx.shadowBlur = 22 * S;
-      ctx.fillStyle = titleGrad;
-      ctx.fillText(state.title, W / 2, ty);
-      ctx.restore();
-    }
-    /* sparkle glints */
-    ctx.fillStyle = '#ffffff';
-    var twd = ctx.measureText(state.title).width;
-    var glints = [[-0.34, -0.32, 0.10], [0.28, -0.42, 0.08], [0.42, 0.30, 0.07]];
-    for (var gi = 0; gi < glints.length; gi++) {
-      star4(ctx, W / 2 + glints[gi][0] * twd, ty + glints[gi][1] * titlePx, Math.max(5, titlePx * glints[gi][2]));
-      ctx.fill();
-    }
-
-    /* script subtitle overlapping the title's bottom edge */
-    ctx.font = Math.round(titlePx * 0.34) + 'px "Great Vibes", cursive';
-    ctx.fillStyle = '#ffffff';
-    ctx.shadowColor = 'rgba(255,255,255,0.9)';
-    ctx.shadowBlur = 10 * S;
-    ctx.fillText(state.subtitle, W / 2, ty + titlePx * 0.32);
-    ctx.shadowColor = 'transparent';
-    ctx.shadowBlur = 0;
-
-    /* tagline pill */
-    ctx.font = '700 ' + Math.round(20 * S + 5) + 'px Anton, "Arial Black", sans-serif';
-    var tagW = ctx.measureText(state.tagline).width + 44 * S;
-    var tagH = Math.round(34 * S + 8);
-    var tagX = (W - tagW) / 2;
-    var tagY = ty + titlePx * 0.62 + 8;
-    ctx.fillStyle = PLUM;
-    roundRect(ctx, tagX, tagY, tagW, tagH, tagH / 2);
-    ctx.fill();
-    ctx.fillStyle = '#fff6e6';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(state.tagline, W / 2, tagY + tagH / 2 + 1);
-
-    /* gold seal */
-    if (state.show.seal) {
-      var sx = W * 0.885, sy = H * 0.775, sr = Math.max(34, W * 0.052);
-      ctx.save();
-      ctx.translate(sx, sy);
-      starburst(ctx, 0, 0, sr, sr * 0.82, 12);
-      ctx.fillStyle = '#ffc21c';
-      ctx.fill();
-      ctx.strokeStyle = '#a86e00';
-      ctx.lineWidth = Math.max(2, 2 * S);
-      ctx.stroke();
-      ctx.fillStyle = PLUM;
-      ctx.font = '900 ' + Math.round(sr * 0.24) + 'px Anton, "Arial Black", sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('ORIGINAL', 0, -sr * 0.16);
-      ctx.fillText('COVER ART', 0, sr * 0.14);
-      ctx.font = '900 ' + Math.round(sr * 0.20) + 'px Anton, "Arial Black", sans-serif';
-      ctx.fillText('★ 2026 ★', 0, sr * 0.44);
-      ctx.restore();
-      ctx.textAlign = 'left';
-    }
-
-    /* billing block */
-    if (state.show.billing) {
-      ctx.fillStyle = '#5c4a55';
-      ctx.font = '700 ' + Math.round(11 * S + 4) + 'px Anton, "Arial Black", sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      fitFont(ctx, state.billing, W * 0.94, Math.round(11 * S + 4), 'Anton, "Arial Black", sans-serif', '700');
-      ctx.fillText(state.billing, W / 2, H * 0.845);
-      ctx.textAlign = 'left';
-    }
-
-    /* palm strip along the bottom */
-    if (state.show.strip) {
-      var stripY = H * 0.885;
-      var stripGrad = ctx.createLinearGradient(0, stripY, 0, H);
-      stripGrad.addColorStop(0, grade.strip[0]);
-      stripGrad.addColorStop(0.55, grade.strip[1]);
-      stripGrad.addColorStop(1, grade.strip[2]);
-      ctx.fillStyle = stripGrad;
-      ctx.fillRect(0, stripY, W, H - stripY);
-      /* rising sun, centre-bottom */
-      var sunX = W * 0.66, sunBase = H * 0.985;
-      ctx.strokeStyle = PLUM;
-      ctx.lineWidth = Math.max(2, 2.5 * S);
-      for (var ri = 0; ri < 9; ri++) {
-        var ra = Math.PI + (ri / 8) * Math.PI;
-        var rIn = W * 0.042, rOut = W * 0.062;
-        ctx.beginPath();
-        ctx.moveTo(sunX + Math.cos(ra) * rIn, sunBase - Math.abs(Math.sin(ra)) * H * 0.038);
-        ctx.lineTo(sunX + Math.cos(ra) * rOut, sunBase - Math.abs(Math.sin(ra)) * H * 0.055);
-        ctx.stroke();
-      }
-      ctx.fillStyle = '#ffe9a3';
-      ctx.beginPath();
-      ctx.arc(sunX, sunBase, W * 0.038, Math.PI, 0);
-      ctx.closePath();
-      ctx.fill();
-      ctx.strokeStyle = PLUM;
-      ctx.stroke();
-      /* palms */
-      drawPalm(ctx, W * 0.03, H * 0.995, Math.max(0.7, S * 0.9), false);
-      drawPalm(ctx, W * 0.10, H * 0.995, Math.max(0.55, S * 0.65), true);
-      drawPalm(ctx, W * 0.88, H * 0.995, Math.max(0.7, S * 0.9), true);
-      /* COMING SOON pill */
-      var cs = '★ COMING SOON';
-      ctx.font = '900 ' + Math.round(17 * S + 5) + 'px Anton, "Arial Black", sans-serif';
-      var csw = ctx.measureText(cs).width + 36 * S;
-      var csh = Math.round(30 * S + 8);
-      ctx.fillStyle = PLUM;
-      roundRect(ctx, (W - csw) / 2, stripY + (H - stripY - csh) / 2, csw, csh, csh / 2);
-      ctx.fill();
-      ctx.fillStyle = '#fff6e6';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(cs, W / 2, stripY + (H - stripY) / 2 + 1);
-      ctx.textAlign = 'left';
-      /* barcode, bottom-right */
-      var bcx = W * 0.955, bcy = H * 0.935, bcw = W * 0.042, bch = H * 0.05;
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(bcx - 4 * S, bcy - 4 * S, bcw + 8 * S, bch + 8 * S);
-      ctx.fillStyle = INK;
-      var bars = [3, 1, 2, 1, 1, 3, 2, 1, 1, 2, 3, 1, 2, 2, 1, 3, 1, 2];
-      var bx2 = bcx;
-      for (var bi2 = 0; bi2 < bars.length; bi2++) {
-        var bw2 = bars[bi2] * 1.6 * S;
-        if (bi2 % 2 === 0) ctx.fillRect(bx2, bcy, bw2, bch);
-        bx2 += bw2 + 1.4 * S;
-      }
-    }
-
-    /* poster-ink halftone + grain over everything */
-    if (state.ink && state.halftone > 0) {
-      ctx.save();
-      ctx.globalAlpha = (state.halftone / 100) * 0.16;
-      ctx.fillStyle = ctx.createPattern(halftonePattern(), 'repeat');
-      ctx.fillRect(0, 0, W, H);
-      ctx.restore();
-    }
-    if (state.grain > 0) {
-      ctx.save();
-      ctx.globalAlpha = (state.grain / 100) * 0.14;
-      ctx.fillStyle = ctx.createPattern(grainPattern(), 'repeat');
-      ctx.fillRect(0, 0, W, H);
-      ctx.restore();
-    }
-
-    /* outer frame */
-    frameRect(ctx, W * 0.006, H * 0.006, W * 0.988, H * 0.988, grade.frame, Math.max(2, 3 * S));
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'alphabetic';
-    return { slots: rects, photos: photos };
-  }
-
-  /* Export a cover at full resolution; returns a Promise<Blob>. */
-  function exportCover(state, images, sizeKey) {
-    var size = SIZES[sizeKey] || SIZES.square;
-    var c = document.createElement('canvas');
-    c.width = size.w;
-    c.height = size.h;
-    renderCover(c, Object.assign({}, state, { size: sizeKey }), images);
-    return new Promise(function (resolve) {
-      c.toBlob(function (b) { resolve(b); }, 'image/png');
+  // Role labels — clamped above the bottom bar so they are never covered.
+  if (state.showRoles) {
+    rects.forEach((r, i) => {
+      const p = state.panels[i] || defaultState().panels[i];
+      drawRoleLabel(ctx, r, p.role || DEFAULT_ROLES[i] || 'THE CREW', grade.accent, state.showFooter ? bbY : py + ph);
     });
   }
 
-  global.CoralDawn = {
-    SAMPLES: SAMPLES, ROLES: ROLES, GRADES: GRADES, LAYOUTS: LAYOUTS, SIZES: SIZES,
-    defaultState: defaultState, slotPhotos: slotPhotos, slotRects: slotRects,
-    renderCover: renderCover, exportCover: exportCover, titleY: titleY
-  };
-})(typeof window !== 'undefined' ? window : globalThis);
+  // Top bar: stars + press quote + outlet + ticket box.
+  const barH = ph * 0.075;
+  ctx.fillStyle = 'rgba(12,6,26,0.88)'; ctx.fillRect(px, py, pw, barH);
+  const starR = barH * 0.26;
+  let sx = px + pw * 0.02;
+  for (let i = 0; i < 5; i++) { drawStar(ctx, sx, py + barH / 2, starR, '#f5b942'); sx += starR * 2.3; }
+  if (state.showQuote) {
+    ctx.fillStyle = '#ffe9ad';
+    ctx.font = `italic 700 ${barH * 0.42}px Georgia, serif`;
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.fillText(`“${state.quote}”`, sx + starR, py + barH / 2, pw * 0.52);
+    ctx.fillStyle = '#ff8a6b';
+    ctx.font = `400 ${barH * 0.34}px Anton, sans-serif`;
+    ctx.fillText(`— ${state.outlet}`, sx + starR, py + barH * 0.86, pw * 0.52);
+  }
+  // Ticket box, top right.
+  const tbW = pw * 0.115, tbH = barH * 0.78, tbX = px + pw - tbW - pw * 0.012, tbY = py + barH * 0.11;
+  ctx.fillStyle = '#f5b942'; ctx.fillRect(tbX, tbY, tbW, tbH);
+  ctx.strokeStyle = '#7a4d00'; ctx.lineWidth = Math.max(1.5, 2 * u); ctx.strokeRect(tbX, tbY, tbW, tbH);
+  ctx.fillStyle = '#3a1c00'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = `400 ${tbH * 0.42}px Anton, sans-serif`;
+  ctx.fillText(state.ticket, tbX + tbW / 2, tbY + tbH / 2, tbW * 0.92);
+
+  // Kicker just under the top bar, over the hero's open sky. On square/portrait
+  // covers the sunrise badge sits in the hero's top-left corner, so the kicker
+  // drops a little lower to clear it.
+  const tz = titleZone(state.layout);
+  const titleY = py + ph * tz.y;
+  const titleSize = ph * tz.size;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+  ctx.fillStyle = '#ffe9ad';
+  ctx.font = `400 ${barH * 0.40}px Anton, sans-serif`;
+  try { ctx.letterSpacing = `${barH * 0.10}px`; } catch (e) { /* older canvas */ }
+  ctx.fillText('W E L C O M E   T O   P E A C H   C O V E', px + pw / 2, py + barH + ph * (wide ? 0.038 : 0.09));
+  try { ctx.letterSpacing = '0px'; } catch (e) { /* noop */ }
+
+  // On a wide cover the title sits dead centre; on square/portrait it shifts
+  // towards the hero side so it never hides the right column's faces.
+  const titleCx = state.layout === 'hero-right' && !wide ? px + pw * 0.64
+    : state.layout === 'hero-left' && !wide ? px + pw * 0.34 : px + pw / 2;
+  const title = (state.title || 'CORAL DAWN').toUpperCase();
+  ctx.font = `${titleSize}px Anton, sans-serif`;
+  const tw = ctx.measureText(title).width;
+  const tScale = Math.min(1, (pw * (wide ? 0.92 : 0.62)) / tw);
+  ctx.save();
+  ctx.translate(titleCx, titleY);
+  ctx.scale(tScale, tScale);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  let grad;
+  if (state.titleStyle === 'glow') {
+    grad = ctx.createLinearGradient(-tw / 2, 0, tw / 2, 0);
+    grad.addColorStop(0, '#2fe8ff'); grad.addColorStop(0.5, '#b04dff'); grad.addColorStop(1, '#ff2fb3');
+    ctx.shadowColor = '#ff2fb3'; ctx.shadowBlur = titleSize * 0.30 * state.glow;
+  } else {
+    grad = ctx.createLinearGradient(0, -titleSize * 0.5, 0, titleSize * 0.5);
+    grad.addColorStop(0, '#ff5e7a'); grad.addColorStop(0.34, '#ff5e7a');
+    grad.addColorStop(0.34, '#ffb37a'); grad.addColorStop(0.67, '#ffb37a');
+    grad.addColorStop(0.67, '#ffe98a'); grad.addColorStop(1, '#ffe98a');
+    ctx.shadowColor = '#ff2fb3'; ctx.shadowBlur = titleSize * 0.14 * state.glow;
+  }
+  // Hard offset drop shadow.
+  ctx.fillStyle = '#1a0b2e';
+  ctx.fillText(title, titleSize * 0.045, titleSize * 0.06);
+  // Dark outline, then gradient fill.
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = '#1a0b2e'; ctx.lineWidth = titleSize * 0.055;
+  ctx.strokeText(title, 0, 0);
+  ctx.fillStyle = grad;
+  ctx.fillText(title, 0, 0);
+  ctx.shadowBlur = 0;
+  ctx.restore();
+
+  // Sparkles on the title.
+  drawSparkle(ctx, titleCx - (tw * tScale) / 2 - titleSize * 0.12, titleY - titleSize * 0.55, titleSize * 0.09, '#ffffff', titleSize * 0.2 * state.glow);
+  drawSparkle(ctx, titleCx + (tw * tScale) / 2 + titleSize * 0.10, titleY + titleSize * 0.35, titleSize * 0.07, '#ffffff', titleSize * 0.16 * state.glow);
+  drawSparkle(ctx, titleCx + (tw * tScale) / 2 - titleSize * 0.3, titleY - titleSize * 0.62, titleSize * 0.05, '#ffe98a', titleSize * 0.12 * state.glow);
+
+  // Script subtitle, cyan, overlapping the title's lower edge.
+  ctx.save();
+  ctx.translate(titleCx, titleY + titleSize * 0.62);
+  ctx.rotate(-0.02);
+  ctx.font = `${titleSize * 0.42}px "Great Vibes", cursive`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.shadowColor = '#2fe8ff'; ctx.shadowBlur = titleSize * 0.16 * state.glow;
+  ctx.fillStyle = '#35f0ff';
+  ctx.fillText(state.subtitle || 'first light, last getaway', 0, 0);
+  ctx.restore();
+
+  // Ribbon slogan.
+  const ribbon = state.tagline || '';
+  ctx.font = `400 ${titleSize * 0.135}px Anton, sans-serif`;
+  const rw = Math.min(pw * 0.62, ctx.measureText(ribbon).width + titleSize * 0.5);
+  const rh = titleSize * 0.26;
+  const rx = titleCx - rw / 2, ry = titleY + titleSize * 0.86;
+  ctx.fillStyle = 'rgba(12,6,26,0.94)';
+  ctx.beginPath();
+  ctx.roundRect(rx, ry, rw, rh, rh / 2); ctx.fill();
+  ctx.strokeStyle = grade.accent; ctx.lineWidth = Math.max(1.5, 2.5 * u); ctx.stroke();
+  ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(ribbon, titleCx, ry + rh / 2 + rh * 0.04, rw * 0.94);
+
+  // "SUNRISE 06:47" badge on the hero panel: bottom-left above its role tag on
+  // wide covers; top-left corner on square/portrait, where the bottom is crowded.
+  if (state.showStamps && rects[0]) {
+    const b = rects[0];
+    const bw = Math.min(b.w * 0.30, W * 0.17), bh = Math.max(22, b.h * 0.055);
+    const roleBarH = Math.max(20, b.h * 0.115);
+    const labelY = Math.min(b.y + b.h - roleBarH, bbY - roleBarH);
+    const bx = b.x + b.w * 0.03;
+    const by = wide ? labelY - bh - 10 : py + barH + 8;
+    ctx.fillStyle = 'rgba(12,6,26,0.9)';
+    ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, bh / 2); ctx.fill();
+    ctx.strokeStyle = grade.accent; ctx.lineWidth = Math.max(1.5, 2 * u); ctx.stroke();
+    ctx.fillStyle = '#ffe9ad'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = `400 ${bh * 0.44}px Anton, sans-serif`;
+    ctx.fillText('SUNRISE 06:47', bx + bw / 2, by + bh / 2 + bh * 0.03, bw * 0.92);
+  }
+
+  // Bottom bar: COMING SOON + credits + barcode + seal.
+  if (state.showFooter) {
+    ctx.fillStyle = 'rgba(12,6,26,0.92)'; ctx.fillRect(px, bbY, pw, bbH);
+    ctx.fillStyle = grade.accent;
+    ctx.font = `400 ${bbH * 0.42}px Anton, sans-serif`;
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.fillText('COMING SOON', px + pw * 0.02, bbY + bbH / 2);
+    if (state.showBilling) {
+      ctx.fillStyle = '#d9c9a8';
+      ctx.font = `400 ${bbH * 0.20}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillText(state.billing, px + pw / 2, bbY + bbH / 2, pw * 0.58);
+    }
+    const bcW = pw * 0.075, bcH = bbH * 0.58;
+    drawBarcode(ctx, px + pw - bcW - pw * 0.012, bbY + bbH * 0.21, bcW, bcH, 1234567);
+    if (state.showSeal) drawSeal(ctx, px + pw - bcW - pw * 0.10, bbY + bbH * 0.5, bbH * 0.62, 'FIRST LIGHT');
+  }
+
+  // Grain over everything.
+  if (state.grain > 0.03) {
+    ctx.save();
+    ctx.globalAlpha = state.grain * 0.10;
+    ctx.globalCompositeOperation = 'overlay';
+    const n = 140;
+    const noise = document.createElement('canvas');
+    noise.width = n; noise.height = n;
+    const nctx = noise.getContext('2d');
+    const id = nctx.createImageData(n, n);
+    for (let i = 0; i < id.data.length; i += 4) {
+      const v = 110 + Math.random() * 90;
+      id.data[i] = v; id.data[i + 1] = v; id.data[i + 2] = v; id.data[i + 3] = 255;
+    }
+    nctx.putImageData(id, 0, 0);
+    ctx.fillStyle = ctx.createPattern(noise, 'repeat');
+    ctx.fillRect(px, py, pw, ph);
+    ctx.restore();
+  }
+  return { panels: rects, poster: { x: px, y: py, w: pw, h: ph } };
+}
+
+// Fit "cover" crop math shared by the editor's hit-testing.
+export function panelPhotoRect(img, rect, panel) {
+  const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
+  const scale = Math.max(rect.w / iw, rect.h / ih) * (panel.zoom || 1);
+  return { w: iw * scale, h: ih * scale, x: rect.x + rect.w / 2 - iw * scale * (panel.x ?? 0.5), y: rect.y + rect.h / 2 - ih * scale * (panel.y ?? 0.5) };
+}

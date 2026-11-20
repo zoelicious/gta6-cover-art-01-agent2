@@ -3,121 +3,147 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Coral Dawn — Cover Art Studio · Peach Cove Pictures</title>
+<title>Coral Dawn — GTA 6 Cover Art Studio</title>
 <link rel="stylesheet" href="style.css">
-<link rel="stylesheet" href="fonts/fonts.css">
 </head>
 <body>
 <header class="topbar">
   <div class="brand">
-    <span class="brand-sun" aria-hidden="true"></span>
+    <span class="brand-mark">☀</span>
     <div>
       <h1>CORAL DAWN</h1>
-      <p>Cover Art Studio · Peach Cove Pictures</p>
+      <p>GTA 6 cover art studio · Peach Cove</p>
     </div>
   </div>
-  <nav class="steps" aria-label="Steps">
-    <span class="step on"><b>1</b> Add photos</span>
-    <span class="step"><b>2</b> Caption &amp; layout</span>
-    <span class="step"><b>3</b> Export PNG</span>
-  </nav>
+  <ol class="steps">
+    <li class="done"><b>1</b> Add photos</li>
+    <li class="done"><b>2</b> Caption &amp; layout</li>
+    <li><b>3</b> Export PNG</li>
+  </ol>
   <div class="top-actions">
-    <button id="surpriseBtn" type="button" class="btn ghost">Surprise me</button>
-    <button id="undoBtn" type="button" class="btn ghost" disabled>Undo</button>
-    <button id="redoBtn" type="button" class="btn ghost" disabled>Redo</button>
-    <button id="exportBtnTop" type="button" class="btn coral">Export PNG</button>
+    <button id="undoBtn" class="btn ghost" disabled>↩ Undo</button>
+    <button id="redoBtn" class="btn ghost" disabled>↪ Redo</button>
+    <button id="surpriseBtn" class="btn coral">✦ Surprise me</button>
   </div>
 </header>
 
-<main class="editor">
+<main class="studio">
   <aside class="rail left">
     <section>
       <h2>Photos</h2>
-      <p class="note">Your photos never leave this device. Nothing is uploaded.</p>
-      <div class="row">
-        <button id="addPhotosBtn" type="button" class="btn teal">Add photos</button>
-        <button id="sampleBtn" type="button" class="btn outline">Try sample photos</button>
+      <div id="dropZone" class="dropzone" tabindex="0">
+        <span class="dz-big">＋ Add photos</span>
+        <span class="dz-small">Click, drag &amp; drop, or paste an image</span>
+        <input id="fileInput" type="file" accept="image/*" multiple hidden>
       </div>
-      <input id="fileInput" type="file" accept="image/*" multiple hidden>
-      <div id="photoStrip" class="strip" aria-label="Loaded photos"></div>
-      <button id="autoFillBtn" type="button" class="btn outline wide">Auto-fill panels</button>
-      <p class="hint">Click a photo, then click a panel to place it. Drag a photo onto a panel to swap.</p>
+      <button id="samplesBtn" class="btn teal wide">Try sample photos</button>
+      <p id="photoCount" class="muted">No photos yet</p>
+      <div id="photoStrip" class="thumbs"></div>
+      <p class="muted tiny">Click a thumbnail to put that photo in the selected panel. Photos never leave your device.</p>
+      <button id="autofillBtn" class="btn ghost wide">Auto-fill panels</button>
     </section>
+
     <section>
       <h2>Layout</h2>
-      <div id="layoutChips" class="chips"></div>
+      <div id="layoutRow" class="chips"></div>
     </section>
+
     <section>
       <h2>Colour grade</h2>
-      <div id="gradeChips" class="chips"></div>
-    </section>
-    <section>
-      <h2>Effects</h2>
-      <label class="slider-row">Paint <input id="paintRange" type="range" min="0" max="100" value="65"> <span id="paintVal">65</span></label>
-      <label class="slider-row">Halftone <input id="halftoneRange" type="range" min="0" max="100" value="30"> <span id="halftoneVal">30</span></label>
-      <label class="slider-row">Grain <input id="grainRange" type="range" min="0" max="100" value="25"> <span id="grainVal">25</span></label>
-      <label class="slider-row">Glow <input id="glowRange" type="range" min="0" max="100" value="40"> <span id="glowVal">40</span></label>
-      <label class="check"><input id="inkToggle" type="checkbox" checked> Poster ink (halftone dots)</label>
+      <div id="gradeRow" class="chips"></div>
+      <label class="slider">Paint strength <input id="paintRange" type="range" min="0" max="100" value="80"></label>
+      <label class="slider">Halftone / poster ink <input id="halftoneRange" type="range" min="0" max="100" value="50"></label>
+      <label class="slider">Grain <input id="grainRange" type="range" min="0" max="100" value="35"></label>
+      <label class="slider">Neon glow <input id="glowRange" type="range" min="0" max="100" value="80"></label>
     </section>
   </aside>
 
   <section class="centre">
-    <div id="sizeTabs" class="size-tabs" role="tablist" aria-label="Export size"></div>
     <div class="preview-wrap">
-      <canvas id="preview" width="760" height="760"></canvas>
+      <canvas id="preview" width="960" height="540"></canvas>
     </div>
-    <p id="selectedLabel" class="selected-label">Selected: Hero band · THE DRIVER — Boulevard · drag to move · scroll to zoom</p>
-    <p class="hint centre-hint">Click a panel to select it · Drag to move · Scroll to zoom · Double-click to reset · Shift-drag a photo onto another panel to swap</p>
-    <button id="exportAllBtn" type="button" class="btn coral wide big">Export all three sizes</button>
+    <p class="hint">Drag to move · Scroll to zoom · Shift-drag to swap panels · Double-click to reset a panel</p>
+    <p class="hint"><span id="zoomReadout">Panel 1 · zoom 100%</span></p>
   </section>
 
   <aside class="rail right">
     <section>
       <h2>Caption</h2>
-      <label>Title (block caps)<input id="titleField" type="text" value="CORAL DAWN"></label>
-      <label>Subtitle (script)<input id="subtitleField" type="text" value="chasing the sunrise"></label>
-      <label>Tagline (three phrases)<input id="taglineField" type="text" value="SUN UP · ENGINES HOT · NO WAY BACK"></label>
-      <label>Press quote<input id="quoteField" type="text" value="A SUNRISE YOU CAN HANG ON YOUR WALL"></label>
-      <label>Quote outlet<input id="outletField" type="text" value="THE PEACH COVE GAZETTE"></label>
-      <label>Ticket badge<input id="badgeField" type="text" value="VOL. 02"></label>
-      <label>Title style
-        <select id="titleStyle">
-          <option value="striped" selected>Striped dawn</option>
-          <option value="glow">Smooth glow</option>
-        </select>
+      <label class="field">Title
+        <input id="titleInput" type="text" value="CORAL DAWN" maxlength="24">
       </label>
-    </section>
-    <section>
-      <h2>Poster extras</h2>
-      <label class="check"><input id="tglRoles" type="checkbox" checked> Role tags on panels</label>
-      <label class="check"><input id="tglQuote" type="checkbox" checked> Top quote bar</label>
-      <label class="check"><input id="tglSeal" type="checkbox" checked> Gold seal</label>
-      <label class="check"><input id="tglStamps" type="checkbox" checked> Sunrise stamps</label>
-      <label class="check"><input id="tglBilling" type="checkbox" checked> Billing block</label>
-      <label class="check"><input id="tglStrip" type="checkbox" checked> Sunrise strip</label>
-    </section>
-    <section>
-      <h2>Selected panel</h2>
-      <label class="slider-row">Zoom <input id="zoomRange" type="range" min="50" max="300" value="100"> <span id="zoomVal">100%</span></label>
-      <label class="slider-row">Shift X <input id="shiftXRange" type="range" min="-200" max="200" value="0"></label>
-      <label class="slider-row">Shift Y <input id="shiftYRange" type="range" min="-200" max="200" value="0"></label>
-      <div class="row">
-        <button id="rotateBtn" type="button" class="btn outline">Rotate</button>
-        <button id="flipBtn" type="button" class="btn outline">Flip</button>
-        <button id="resetBtn" type="button" class="btn outline">Reset</button>
+      <label class="field">Subtitle (script)
+        <input id="subtitleInput" type="text" value="first light, last getaway" maxlength="48">
+      </label>
+      <label class="field">Ribbon slogan
+        <input id="taglineInput" type="text" value="SUN UP · ENGINES HOT · NO WAY BACK" maxlength="64">
+      </label>
+      <label class="field">Press quote
+        <input id="quoteInput" type="text" value="A SUNRISE YOU CAN HANG ON YOUR WALL" maxlength="64">
+      </label>
+      <div class="row2">
+        <label class="field">Outlet
+          <input id="outletInput" type="text" value="THE CORAL LEDGER" maxlength="32">
+        </label>
+        <label class="field">Ticket badge
+          <input id="ticketInput" type="text" value="DAWN EDITION" maxlength="20">
+        </label>
       </div>
-      <div id="roleFields" class="role-fields"></div>
+      <label class="field">Billing line
+        <textarea id="billingInput" rows="2" maxlength="160">PEACH COVE PICTURES PRESENTS · A CORAL DAWN PRODUCTION · STARRING YOU · SHOT ON YOUR OWN CAMERA · GRADED BY HAND</textarea>
+      </label>
+      <div class="seg">
+        <span>Title style</span>
+        <button data-style="striped" class="btn ghost active">Striped dawn</button>
+        <button data-style="glow" class="btn ghost">Neon glow</button>
+      </div>
     </section>
+
     <section>
-      <button id="addPhotosBtn2" type="button" class="btn teal wide">Add photos</button>
-      <button id="surpriseBtn2" type="button" class="btn outline wide">Surprise me / remix</button>
-      <button id="exportBtn" type="button" class="btn coral wide big">Export PNG</button>
-      <p class="note">Exports re-render at full resolution on canvas — 1080×1080, 1080×1350 or 1920×1080 — and download a real PNG.</p>
+      <h2>Poster furniture</h2>
+      <label class="check"><input id="toggleRoles" type="checkbox" checked> Role tags on panels</label>
+      <label class="check"><input id="toggleQuote" type="checkbox" checked> Press quote bar</label>
+      <label class="check"><input id="toggleStamps" type="checkbox" checked> Sunrise strip + 06:47 badge</label>
+      <label class="check"><input id="toggleSeal" type="checkbox" checked> “First Light” seal</label>
+      <label class="check"><input id="toggleBilling" type="checkbox" checked> Billing line</label>
+      <label class="check"><input id="toggleFooter" type="checkbox" checked> Bottom bar (Coming soon · barcode)</label>
+    </section>
+
+    <section>
+      <h2 id="panelLabel">Panel 1 — THE DRIVER</h2>
+      <label class="field">Role
+        <input id="panelRole" type="text" value="THE DRIVER" maxlength="20">
+      </label>
+      <label class="slider">Zoom <input id="panelZoom" type="range" min="0" max="100" value="20"></label>
+      <label class="slider">Pan X <input id="panelX" type="range" min="0" max="100" value="50"></label>
+      <label class="slider">Pan Y <input id="panelY" type="range" min="0" max="100" value="42"></label>
+      <div class="btn-row">
+        <button id="flipBtn" class="btn ghost">⇄ Flip</button>
+        <button id="rotBtn" class="btn ghost">⟳ Rotate</button>
+        <button id="swapBtn" class="btn ghost">⇄ Swap</button>
+        <button id="resetPanelBtn" class="btn ghost">Reset</button>
+      </div>
+    </section>
+
+    <section class="export">
+      <h2>Export PNG</h2>
+      <div class="seg sizes">
+        <button data-size="1920x1080" class="btn ghost active">1920 × 1080</button>
+        <button data-size="1080x1080" class="btn ghost">1080 × 1080</button>
+        <button data-size="1080x1350" class="btn ghost">1080 × 1350</button>
+      </div>
+      <button id="exportBtn" class="btn coral wide big">⬇ Export PNG</button>
+      <button id="exportAllBtn" class="btn teal wide">Export all three sizes</button>
+      <p class="muted tiny">Full-resolution re-render on canvas — not a screenshot. One click, ready to post.</p>
     </section>
   </aside>
 </main>
 
-<script src="src/cover.js"></script>
-<script src="src/main.js"></script>
+<footer class="foot">
+  <span>Coral Dawn — an original cover maker. No Rockstar logo, artwork or fonts. Photos never leave your device.</span>
+  <span>Built for the make.fun GTA 6 cover art bounty.</span>
+</footer>
+
+<script type="module" src="src/main.js"></script>
 </body>
 </html>

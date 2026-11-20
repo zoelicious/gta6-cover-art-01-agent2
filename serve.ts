@@ -1,47 +1,25 @@
-/* Coral Dawn — tiny static server for local tries.
-   Serves app/ at http://localhost:8080 so the studio can be opened in
-   desktop Chrome exactly as a static host would serve it. Node stdlib only. */
+// Tiny static server for trying the app locally: serves app/ at
+// http://localhost:8080. Node 22, standard library only.
 import { createServer } from 'node:http';
-import { createReadStream, existsSync, statSync } from 'node:fs';
-import { extname, join, normalize, resolve } from 'node:path';
+import { readFile } from 'node:fs/promises';
+import { join, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const root = resolve(join(fileURLToPath(new URL('.', import.meta.url)), 'app'));
-const port = Number(process.env.PORT || 8080);
-
-const TYPES = {
-  '.html': 'text/html; charset=utf-8',
-  '.css': 'text/css; charset=utf-8',
-  '.js': 'text/javascript; charset=utf-8',
-  '.mjs': 'text/javascript; charset=utf-8',
-  '.jpg': 'image/jpeg',
-  '.jpeg': 'image/jpeg',
-  '.png': 'image/png',
-  '.ttf': 'font/ttf',
-  '.woff2': 'font/woff2',
-  '.json': 'application/json'
+const root = join(fileURLToPath(new URL('.', import.meta.url)), 'app');
+const types = {
+  '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript',
+  '.mjs': 'text/javascript', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+  '.png': 'image/png', '.ttf': 'font/ttf', '.txt': 'text/plain',
 };
 
-const server = createServer((req, res) => {
-  const url = new URL(req.url || '/', 'http://localhost');
-  let path = normalize(join(root, decodeURIComponent(url.pathname)));
-  if (!path.startsWith(root)) {
-    res.writeHead(403);
-    res.end('forbidden');
-    return;
+createServer(async (req, res) => {
+  const path = decodeURIComponent(new URL(req.url, 'http://x').pathname);
+  const file = join(root, path === '/' ? 'index.html' : path);
+  try {
+    const data = await readFile(file);
+    res.writeHead(200, { 'content-type': types[extname(file)] ?? 'application/octet-stream' });
+    res.end(data);
+  } catch {
+    res.writeHead(404); res.end('not found');
   }
-  if (path === root || statSync(path, { throwIfNoEntry: false })?.isDirectory()) {
-    path = join(path, 'index.html');
-  }
-  if (!existsSync(path)) {
-    res.writeHead(404);
-    res.end('not found');
-    return;
-  }
-  res.writeHead(200, { 'Content-Type': TYPES[extname(path)] || 'application/octet-stream' });
-  createReadStream(path).pipe(res);
-});
-
-server.listen(port, () => {
-  console.log('Coral Dawn studio at http://localhost:' + port);
-});
+}).listen(8080, () => console.log('Coral Dawn at http://localhost:8080'));

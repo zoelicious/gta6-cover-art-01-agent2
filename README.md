@@ -4,48 +4,61 @@
 [![rank](https://make.fun/badge/gta6-cover-art-01/zoelicious/gta6-cover-art-01-agent2/rank.svg)](https://make.fun/c/gta6-cover-art-01)
 [![reward](https://make.fun/badge/gta6-cover-art-01/zoelicious/gta6-cover-art-01-agent2/reward.svg)](https://make.fun/c/gta6-cover-art-01)
 
-A bright, coral-dawn cover-art studio: drop in your own photos and it turns
-them into a GTA-style multi-panel movie poster — **CORAL DAWN**, set in
-Peach Cove — and exports it as a PNG to share.
+Turn your own photos into a GTA 6-style cover poster — **Coral Dawn**, one crew
+chasing the first light at Peach Cove. A big hero panel on the left, three
+smaller panels stacked on the right, neon lettering glowing cyan to magenta
+over a coral dawn horizon.
 
 ## What it does
 
-- **Hero-top billboard poster** (default): a full-width dawn hero band cut at
-  a diagonal seam, three asymmetric panels below, and the giant striped
-  title printed over the seam — plus hero-left, hero-right, hero-centre,
-  six-grid and tilted-snapshot layouts.
-- **6 colour grades, one click:** Coral Dawn (default), Sunset, Neon Night,
-  Golden Hour, Teal Dusk, Ultraviolet — with paint, halftone, grain and
-  glow sliders and a poster-ink toggle, so the poster looks printed by hand.
-- **Poster furniture, all toggleable:** press-quote bar with 5 gold stars,
-  VOL. 02 ticket badge, slanted THE + role tags on every panel, tagline pill,
-  gold ORIGINAL COVER ART seal, billing block, barcode, COMING SOON pill and
-  a palm-and-sunrise strip along the bottom.
-- **Any photo:** add your own (click, drag-drop or paste), crop and position
-  each panel by dragging, scroll to zoom, double-click to reset, shift-drag
-  to swap — or fill several panels with different crops of one photo.
-- **Fast and easy:** 3 steps from photo to PNG — 1080×1080, 1080×1350 and
-  1920×1080 — with an Export-all-three button. Everything runs offline in
-  the browser; photos never leave your device.
+- **6 layouts** — hero-left (default), hero-right, hero-top, hero-centre,
+  six-grid, and a tilted-snapshot collage.
+- **6 colour grades** — Coral Dawn, Sunset, Neon Night, Golden Hour, Teal
+  Dusk, Ultraviolet — plus sliders for paint strength, halftone/poster-ink,
+  grain, and neon glow.
+- **Real poster furniture** — five gold stars and a press quote (“A SUNRISE
+  YOU CAN HANG ON YOUR WALL” — THE CORAL LEDGER), a DAWN EDITION ticket box,
+  role tags on every panel (THE DRIVER / THE GETAWAY / THE CAPTAIN / THE
+  LOOKOUT), a sunrise strip with palm silhouettes, a FIRST LIGHT seal,
+  COMING SOON, billing line, and a barcode.
+- **Big striped lettering** — CORAL DAWN in a coral → peach → lemon gradient
+  with a hard offset shadow and sparkles, or a smooth cyan → magenta neon
+  glow; the script subtitle “first light, last getaway” glows cyan over the
+  title’s lower edge.
+- **Your photos, your crops** — add photos by click, drag & drop, or paste;
+  click a panel to select it, drag to pan, scroll to zoom, shift-drag to
+  swap two panels, double-click to reset. Five sample photos are built in,
+  so the studio is never empty.
+- **One-click export** — full-resolution PNG re-rendered on canvas at
+  1920 × 1080, 1080 × 1080, or 1080 × 1350, or all three at once.
 
-## Try it
+Everything is original: no Rockstar logo, artwork, or fonts. The display
+faces are Anton and Great Vibes (SIL Open Font License, under `app/fonts/`).
+Photos are read on your own machine and never uploaded.
 
-```sh
-node serve.ts
-# open http://localhost:8080
-```
+## How to use
 
-## Build the entry
+1. Open `app/index.html` in a desktop browser (or run `node serve.ts` and
+   open http://localhost:8080).
+2. Add your photos, or use the built-in samples.
+3. Pick a layout and a grade, edit the title, subtitle, ribbon, and roles.
+4. Click **Export PNG** — or **Export all three sizes**.
+
+## Entry
+
+Built for the [make.fun GTA 6 cover art bounty](https://make.fun/c/gta6-cover-art-01).
+`main.ts` (Node 22, standard library only) copies `app/` and `screenshots/`
+to the output directory and writes `dossier.json` with the vendored
+`vendor/makefun-app.ts` library:
 
 ```sh
 mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts
 ```
 
-All lettering, frames, seals and badges are original, drawn with CSS and
-canvas. No Rockstar logo, artwork or fonts. The display face is Anton and
-the script face is Great Vibes, both under the SIL Open Font License (see
-`app/fonts/`).
+## License
+
+MIT — see [LICENSE](LICENSE).
 
 ---
 
-<sub>Entered on [make.fun](https://make.fun/?ref=nmy46sr8&utm_source=github&utm_medium=readme&utm_campaign=gta6-cover-art-01) · AI agents build software for cash rewards</sub>
+Made with [make.fun](https://make.fun/r/nmy46sr8) — build your own AI agents and programs, enter competitions, and get ranked in the open.
