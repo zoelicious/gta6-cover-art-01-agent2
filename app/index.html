@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Coral Dawn — Cover Art Studio · Peach Cove Pictures</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="fonts/fonts.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-sun" aria-hidden="true"></span>
+    <div>
+      <h1>CORAL DAWN</h1>
+      <p>Cover Art Studio · Peach Cove Pictures</p>
+    </div>
+  </div>
+  <nav class="steps" aria-label="Steps">
+    <span class="step on"><b>1</b> Add photos</span>
+    <span class="step"><b>2</b> Caption &amp; layout</span>
+    <span class="step"><b>3</b> Export PNG</span>
+  </nav>
+  <div class="top-actions">
+    <button id="surpriseBtn" type="button" class="btn ghost">Surprise me</button>
+    <button id="undoBtn" type="button" class="btn ghost" disabled>Undo</button>
+    <button id="redoBtn" type="button" class="btn ghost" disabled>Redo</button>
+    <button id="exportBtnTop" type="button" class="btn coral">Export PNG</button>
+  </div>
+</header>
+
+<main class="editor">
+  <aside class="rail left">
+    <section>
+      <h2>Photos</h2>
+      <p class="note">Your photos never leave this device. Nothing is uploaded.</p>
+      <div class="row">
+        <button id="addPhotosBtn" type="button" class="btn teal">Add photos</button>
+        <button id="sampleBtn" type="button" class="btn outline">Try sample photos</button>
+      </div>
+      <input id="fileInput" type="file" accept="image/*" multiple hidden>
+      <div id="photoStrip" class="strip" aria-label="Loaded photos"></div>
+      <button id="autoFillBtn" type="button" class="btn outline wide">Auto-fill panels</button>
+      <p class="hint">Click a photo, then click a panel to place it. Drag a photo onto a panel to swap.</p>
+    </section>
+    <section>
+      <h2>Layout</h2>
+      <div id="layoutChips" class="chips"></div>
+    </section>
+    <section>
+      <h2>Colour grade</h2>
+      <div id="gradeChips" class="chips"></div>
+    </section>
+    <section>
+      <h2>Effects</h2>
+      <label class="slider-row">Paint <input id="paintRange" type="range" min="0" max="100" value="65"> <span id="paintVal">65</span></label>
+      <label class="slider-row">Halftone <input id="halftoneRange" type="range" min="0" max="100" value="30"> <span id="halftoneVal">30</span></label>
+      <label class="slider-row">Grain <input id="grainRange" type="range" min="0" max="100" value="25"> <span id="grainVal">25</span></label>
+      <label class="slider-row">Glow <input id="glowRange" type="range" min="0" max="100" value="40"> <span id="glowVal">40</span></label>
+      <label class="check"><input id="inkToggle" type="checkbox" checked> Poster ink (halftone dots)</label>
+    </section>
+  </aside>
+
+  <section class="centre">
+    <div id="sizeTabs" class="size-tabs" role="tablist" aria-label="Export size"></div>
+    <div class="preview-wrap">
+      <canvas id="preview" width="760" height="760"></canvas>
+    </div>
+    <p id="selectedLabel" class="selected-label">Selected: Hero band · THE DRIVER — Boulevard · drag to move · scroll to zoom</p>
+    <p class="hint centre-hint">Click a panel to select it · Drag to move · Scroll to zoom · Double-click to reset · Shift-drag a photo onto another panel to swap</p>
+    <button id="exportAllBtn" type="button" class="btn coral wide big">Export all three sizes</button>
+  </section>
+
+  <aside class="rail right">
+    <section>
+      <h2>Caption</h2>
+      <label>Title (block caps)<input id="titleField" type="text" value="CORAL DAWN"></label>
+      <label>Subtitle (script)<input id="subtitleField" type="text" value="chasing the sunrise"></label>
+      <label>Tagline (three phrases)<input id="taglineField" type="text" value="SUN UP · ENGINES HOT · NO WAY BACK"></label>
+      <label>Press quote<input id="quoteField" type="text" value="A SUNRISE YOU CAN HANG ON YOUR WALL"></label>
+      <label>Quote outlet<input id="outletField" type="text" value="THE PEACH COVE GAZETTE"></label>
+      <label>Ticket badge<input id="badgeField" type="text" value="VOL. 02"></label>
+      <label>Title style
+        <select id="titleStyle">
+          <option value="striped" selected>Striped dawn</option>
+          <option value="glow">Smooth glow</option>
+        </select>
+      </label>
+    </section>
+    <section>
+      <h2>Poster extras</h2>
+      <label class="check"><input id="tglRoles" type="checkbox" checked> Role tags on panels</label>
+      <label class="check"><input id="tglQuote" type="checkbox" checked> Top quote bar</label>
+      <label class="check"><input id="tglSeal" type="checkbox" checked> Gold seal</label>
+      <label class="check"><input id="tglStamps" type="checkbox" checked> Sunrise stamps</label>
+      <label class="check"><input id="tglBilling" type="checkbox" checked> Billing block</label>
+      <label class="check"><input id="tglStrip" type="checkbox" checked> Sunrise strip</label>
+    </section>
+    <section>
+      <h2>Selected panel</h2>
+      <label class="slider-row">Zoom <input id="zoomRange" type="range" min="50" max="300" value="100"> <span id="zoomVal">100%</span></label>
+      <label class="slider-row">Shift X <input id="shiftXRange" type="range" min="-200" max="200" value="0"></label>
+      <label class="slider-row">Shift Y <input id="shiftYRange" type="range" min="-200" max="200" value="0"></label>
+      <div class="row">
+        <button id="rotateBtn" type="button" class="btn outline">Rotate</button>
+        <button id="flipBtn" type="button" class="btn outline">Flip</button>
+        <button id="resetBtn" type="button" class="btn outline">Reset</button>
+      </div>
+      <div id="roleFields" class="role-fields"></div>
+    </section>
+    <section>
+      <button id="addPhotosBtn2" type="button" class="btn teal wide">Add photos</button>
+      <button id="surpriseBtn2" type="button" class="btn outline wide">Surprise me / remix</button>
+      <button id="exportBtn" type="button" class="btn coral wide big">Export PNG</button>
+      <p class="note">Exports re-render at full resolution on canvas — 1080×1080, 1080×1350 or 1920×1080 — and download a real PNG.</p>
+    </section>
+  </aside>
+</main>
+
+<script src="src/cover.js"></script>
+<script src="src/main.js"></script>
+</body>
+</html>
