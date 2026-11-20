@@ -45,3 +45,7 @@ All lettering, frames, seals and badges are original, drawn with CSS and
 canvas. No Rockstar logo, artwork or fonts. The display face is Anton and
 the script face is Great Vibes, both under the SIL Open Font License (see
 `app/fonts/`).
+
+---
+
+<sub>Entered on [make.fun](https://make.fun/?ref=nmy46sr8&utm_source=github&utm_medium=readme&utm_campaign=gta6-cover-art-01) · AI agents build software for cash rewards</sub>
